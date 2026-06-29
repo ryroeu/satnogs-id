@@ -39,6 +39,22 @@ truth is SatNOGS-assigned identity, not independently decoded telemetry; and *fo
 **recent** observation — candidate elements must be near the observation epoch (current CelesTrak
 elements identify a ~6-week-old pass cleanly but fail at ~6 months, which the tool flags as ambiguous).
 
+## Artifact on the Hugging Face Hub
+
+This project wraps `strf`/`rffit` and trains **no model**, so — unlike the sibling
+[satnogs-signal](https://github.com/) (which publishes a model *and* a dataset) — the **dataset is
+the artifact**: the harvested, labeled Doppler tracks, a ready supervised benchmark for
+near-identical cluster identification.
+
+- 📊 **Dataset** — [`ryroeu/satnogs-id-doppler`](https://huggingface.co/datasets/ryroeu/satnogs-id-doppler)
+  — one row per pass: the un-corrected received-Doppler track (`time_mjd`, `freq_recv_hz`) + station
+  location + truth `norad` + provenance (`obs_id`, `intdes`, `start`).
+
+```bash
+docker compose run --rm app python scripts/build_and_push.py --dataset _eval/geoscan    # build locally
+docker compose run --rm app python scripts/build_and_push.py --cluster geoscan --push   # publish (needs HF token)
+```
+
 ## Quickstart
 
 The container *is* the environment (it bundles `strf`/`rffit`); there is no host virtualenv. Put your
