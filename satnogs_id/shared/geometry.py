@@ -31,6 +31,16 @@ def tle_epoch(line1: str) -> datetime:
     return datetime(year, 1, 1, tzinfo=timezone.utc) + timedelta(days=doy - 1.0)
 
 
+def intdes_from_tle1(line1: str) -> str:
+    """Launch international designator (e.g. '2025-155') from TLE line 1 cols 10-17 ('25155Q'). Lets
+    forward mode derive the candidate launch straight from the observation's own elements."""
+    field = line1[9:17].strip()
+    yy = int(field[:2])
+    num = int(field[2:5])
+    year = 2000 + yy if yy < 57 else 1900 + yy
+    return f"{year}-{num:03d}"
+
+
 def range_rate_km_s(tle1: str, tle2: str, lat: float, lon: float, alt_m: float,
                     times: list[datetime]) -> np.ndarray:
     """Topocentric range rate (km/s; positive = receding) of a satellite from a ground station."""

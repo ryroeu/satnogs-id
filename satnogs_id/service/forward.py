@@ -19,7 +19,7 @@ from pathlib import Path
 from ..id.dat import build_dat, site_line, write_catalog
 from ..id.identify import IdentifyResult, run_rffit_identify
 from ..shared.api import SatnogsClient
-from ..shared.geometry import tle_epoch
+from ..shared.geometry import intdes_from_tle1, tle_epoch
 from ..shared.waterfall import load_waterfall
 
 
@@ -70,8 +70,9 @@ def identify_observation(obs_id: int, *, intdes: str | None = None, catalog: str
                          sites_txt: str = "/opt/strf/data/sites.txt",
                          work_dir: str | Path | None = None,
                          client: SatnogsClient | None = None) -> ForwardID:
-    if not intdes and not catalog:
-        raise ValueError("provide either intdes (live CelesTrak GP) or a catalog file")
+    """Identify obs_id against a candidate catalog. Candidates come from an explicit `catalog` file,
+    or live CelesTrak GP for `intdes`, or -- if neither is given -- the launch derived from the
+    observation's own elements (auto)."""
     client = client if client is not None else SatnogsClient()
     work = Path(work_dir) if work_dir else Path(tempfile.mkdtemp())
     work.mkdir(parents=True, exist_ok=True)
@@ -88,12 +89,12 @@ def identify_observation(obs_id: int, *, intdes: str | None = None, catalog: str
     with open(sites_txt, "a") as f:
         f.write(site_line(wf, site_id))
 
-    if intdes:
-        cat = work / "candidates.tle"
-        write_catalog(client.celestrak_gp_tle(intdes), cat)
-        catalog = cat
-    result = run_rffit_identify(dat, catalog, site_id)  # type: ignore[arg-type]
-    gap = _median_epoch_gap_days(catalog, wf.start)  # type: ignore[arg-type]
+    if catalog is None:
+        intdes = intdes or intdes_from_tle1(wf.tle[1])
+        catalog = work / "candidates.tle"
+        write_catalog(client.celestrak_gp_tle(intdes), catalog)
+    result = run_rffit_identify(dat, catalog, site_id)
+    gap = _median_epoch_gap_days(catalog, wf.start)
     return ForwardID(obs_id, n, result, ambiguous_kHz, gap)
 
 
@@ -108,8 +109,8 @@ def _median_epoch_gap_days(catalog: str | Path, obs_start) -> float | None:
 def _main() -> None:
     ap = argparse.ArgumentParser(description="Forward identification of a SatNOGS observation.")
     ap.add_argument("obs_id", type=int)
-    src = ap.add_mutually_exclusive_group(required=True)
-    src.add_argument("--intdes", help="launch international designator for live CelesTrak candidates, e.g. 2025-155")
+    src = ap.add_mutually_exclusive_group(required=False)
+    src.add_argument("--intdes", help="launch designator for live CelesTrak candidates (default: auto from the obs)")
     src.add_argument("--catalog", help="explicit candidate catalog .tle file")
     ap.add_argument("--site", type=int, default=9001)
     ap.add_argument("--ambiguous-kHz", type=float, default=0.5)

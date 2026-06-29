@@ -1,12 +1,15 @@
 # Run everything through the container -- no host virtualenv. Matches the sibling repos.
 #   docker compose build
 #   docker compose run --rm app pytest -q
-#   docker compose run --rm app python -m satnogs_id.data.build ...   (data stage, lands next)
+#   docker compose run --rm app python -m satnogs_id.data.build geoscan _eval/geoscan
+#   docker compose run --rm --service-ports app python app.py     # Gradio Identify on :7860
 services:
   app:
     build: .
     image: satnogs-id
     working_dir: /app
+    ports:
+      - "7860:7860"     # Gradio Identify view
     volumes:
       - .:/app          # live code + read/write _eval/ etc. on the host
     env_file:
