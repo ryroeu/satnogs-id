@@ -20,11 +20,12 @@ ENV PATH=/opt/strf:${PATH}
 WORKDIR /app
 COPY pyproject.toml ./
 COPY satnogs_id ./satnogs_id
-COPY app.py ./
 RUN pip install --no-cache-dir -e ".[dev]"
+COPY app.py ./
 
 # Default: serve the Gradio Identify view (binds 0.0.0.0:7860). An HF Docker Space runs this CMD;
 # local dev overrides it (e.g. `docker compose run --rm app pytest`). Set SatNOGS/HF tokens as
 # Space secrets -- shared.config reads them from the environment.
+ENV GRADIO_ANALYTICS_ENABLED=False
 EXPOSE 7860
 CMD ["python", "app.py"]
