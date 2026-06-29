@@ -17,26 +17,30 @@ from satnogs_id.data.publish import REPO_ID, build_records, push, to_hf_dataset
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Build + optionally publish the satnogs-id Doppler dataset.")
-    ap.add_argument("--cluster", choices=sorted(CLUSTERS), default="geoscan")
-    ap.add_argument("--dataset", help="existing harvested dataset dir (else harvest the cluster fresh)")
+    ap.add_argument("--cluster", nargs="+", choices=sorted(CLUSTERS), default=["geoscan"],
+                    help="one or more clusters to include")
+    ap.add_argument("--dataset", nargs="*", default=[],
+                    help="existing harvested dataset dir(s), positionally parallel to --cluster")
     ap.add_argument("--out", default="_dataset_build/satnogs-id-doppler")
     ap.add_argument("--push", action="store_true", help="publish to the HF Hub (needs a token)")
     ap.add_argument("--public", action="store_true", help="make the dataset public after pushing")
     ap.add_argument("--card", default="scripts/dataset_card.md", help="dataset card (README) to upload")
     args = ap.parse_args()
 
-    names = CLUSTERS[args.cluster]["truth"]
-    if args.dataset:
-        d = Path(args.dataset)
-        ds = Dataset.load(d) if (d / "manifest.json").exists() else manifest_from_dir(d)
-    else:
-        ds = harvest(args.cluster, args.out + "_raw")
+    records: list = []
+    for i, cluster in enumerate(args.cluster):
+        names = CLUSTERS[cluster]["truth"]
+        if i < len(args.dataset):
+            d = Path(args.dataset[i])
+            ds = Dataset.load(d) if (d / "manifest.json").exists() else manifest_from_dir(d)
+        else:
+            ds = harvest(cluster, f"{args.out}_raw_{cluster}")
+        recs = build_records(ds, names)
+        records += recs
+        print(f"{cluster}: {len(recs)} records")
 
-    records = build_records(ds, names)
     hf = to_hf_dataset(records)
-    print(f"{hf.num_rows} rows; per-object: "
-          + ", ".join(f"{names.get(n, n)}:{sum(1 for r in records if r['norad'] == n)}"
-                      for n in sorted(names)))
+    print(f"{hf.num_rows} total rows across {len(args.cluster)} cluster(s)")
     hf.save_to_disk(args.out)
     print(f"saved dataset to ./{args.out}/")
 

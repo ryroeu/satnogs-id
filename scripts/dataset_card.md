@@ -47,9 +47,14 @@ One row per observation pass. The SatNOGS waterfall is Doppler-*corrected*, so e
 
 ## Current contents
 
-28 passes across the **6 near-identical Geoscan cubesats** (launch `2025-155`) — the hardest possible
-confusers (identical bus). `satnogs-id` scores **28 / 28 top-1** on this set (95% Wilson CI 88–100%)
-via `rffit`'s own `identify_satellite_from_doppler`. Per object: Geoscan-1:7, -2:3, -3:2, -4:5, -5:4, -6:7.
+**51 passes across two identified near-identical clusters** (distinguish them by the `intdes` column),
+the second held out as a generalisation test. Identification is `rffit`'s own
+`identify_satellite_from_doppler`.
+
+- **Geoscan** (`2025-155`) — 6 identical cubesats, **28 passes**, **28/28 top-1** (all rank-1, CI 88–100%).
+- **Tevel-2** (`2025-052`, held-out) — 9 identical cubesats, **23 passes**, **20/23 top-1** (87%, CI 68–95%;
+  all 3 misses are rank-2 near-ties). A different bus / band / geometry the method never saw — it
+  generalises, but isn't a suspiciously-perfect 100%.
 
 ## Usage
 
@@ -65,7 +70,7 @@ line from `station_lat/lon/alt_m`.
 
 ## Limitations
 
-- **One cluster** so far (Geoscan); generalization to other launches is not yet measured.
+- Two clusters so far; both amateur UHF cubesat rideshares. Wider orbit/band coverage is future work.
 - Truth is the **SatNOGS-assigned identity**, not independently decoded telemetry.
 - Tracks are auto-extracted (parabolic sub-bin peak + carrier window + MAD rejection); weak /
   low-elevation passes carry less Doppler curvature, so their margins are thinner.

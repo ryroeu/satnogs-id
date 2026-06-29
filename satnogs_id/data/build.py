@@ -20,6 +20,14 @@ CLUSTERS: dict[str, dict] = {
         "truth": {64879: "Geoscan-6", 64880: "Geoscan-1", 64890: "Geoscan-2",
                   64891: "Geoscan-5", 64892: "Geoscan-4", 64893: "Geoscan-3"},
     },
+    # Tevel-2: 9 near-identical Israeli cubesats, intl 2025-052, launched 2025-03-15.
+    # Held-out generalisation cluster (different bus / band / geometry from Geoscan).
+    "tevel2": {
+        "soup": [63213, 63214, 63215, 63217, 63218, 63219, 63237, 63238, 63239],
+        "truth": {63217: "TEVEL2-1", 63219: "TEVEL2-2", 63218: "TEVEL2-3", 63213: "TEVEL2-4",
+                  63214: "TEVEL2-5", 63215: "TEVEL2-6", 63238: "TEVEL2-7", 63239: "TEVEL2-8",
+                  63237: "TEVEL2-9"},
+    },
 }
 
 

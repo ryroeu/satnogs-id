@@ -25,19 +25,24 @@ signal sits as a near-vertical line. The pipeline:
 
 ## Does it work? (honest eval)
 
-Benchmarked on the **Geoscan** rideshare (intl 2025-155) — 6 near-identical `Geoscan-1…6` cubesats,
-the hardest possible confusers — using SatNOGS-assigned identity as the answer key:
+Benchmarked on **two** identified near-identical clusters (SatNOGS-assigned identity as the answer
+key), the second held out as a generalisation test:
 
-| | result |
-|---|---|
-| **Top-1 accuracy** | **28 / 28** passes, all 6 objects, every one rank-1 |
-| 95% Wilson CI | **88–100%** |
-| Margin over best confuser | median 1.63 kHz (min 0.02 — thin passes exist) |
+| cluster | objects | passes | top-1 | 95% Wilson CI |
+|---|---|---|---|---|
+| **Geoscan** (2025-155, primary) | 6 identical | 28 | **28/28** (all rank-1) | 88–100% |
+| **Tevel-2** (2025-052, **held-out**) | 9 identical | 23 | **20/23** | 68–95% |
 
-**Limitations, stated plainly:** one cluster so far (generalization to a held-out launch is unproven);
-truth is SatNOGS-assigned identity, not independently decoded telemetry; and *forward* mode needs a
-**recent** observation — candidate elements must be near the observation epoch (current CelesTrak
-elements identify a ~6-week-old pass cleanly but fail at ~6 months, which the tool flags as ambiguous).
+The held-out cluster — a different bus, band, and pass geometry the method had never seen —
+generalises at **87%**, and every one of the 3 misses is the *second*-best fit (a near-tie with a
+sibling), not a wild error. That's the honest signature of a physical method near its resolution
+limit on a harder cluster, not an overfit 100%.
+
+**Limitations, stated plainly:** truth is SatNOGS-assigned identity, not independently decoded
+telemetry; thin / low-elevation passes carry less Doppler curvature, so a few siblings sit within
+~0.1 kHz; and *forward* mode needs a **recent** observation — candidate elements must be near the
+observation epoch (current CelesTrak elements identify a ~6-week-old pass cleanly but fail at
+~6 months, which the tool flags as ambiguous).
 
 ## Artifact on the Hugging Face Hub
 
