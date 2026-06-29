@@ -1,0 +1,30 @@
+[project]
+name = "satnogs-id"
+version = "0.1.0"
+description = "Post-launch object identification from multi-station SatNOGS Doppler (wraps strf/rffit)"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "skyfield>=1.45",
+    "h5py>=3.8",
+    "datasets>=2.18",
+    "huggingface_hub>=0.23",
+    "gradio>=4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["satnogs_id*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = ["slow: network / strf-build tests, deselect with -m 'not slow'"]

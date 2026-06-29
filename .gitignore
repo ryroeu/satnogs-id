@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# satnogs-id
+.cache/
+.pytest_cache/
+_eval/
+_dataset_build/

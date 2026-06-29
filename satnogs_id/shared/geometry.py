@@ -1,0 +1,47 @@
+"""Doppler geometry via skyfield, and the Doppler-correction inverse.
+
+The SatNOGS waterfall is Doppler-CORRECTED (verified from the gr-satnogs flowgraph source:
+soapy_source -> doppler_compensation -> waterfall_sink). The station tunes to track the
+satellite's assigned-TLE Doppler, so a signal sits at a near-vertical residual offset. To recover
+the physical received frequency for rffit we add the correction back:
+
+    freq_recv = f0 + offset - f0 * range_rate / c
+
+(exactly as strf's satnogs_waterfall_tabulation_helper.py does). This is independent of which TLE
+was used to correct, so it is non-circular -- it recovers the actual received Doppler curve."""
+from __future__ import annotations
+from datetime import datetime, timezone
+
+import numpy as np
+from skyfield.api import EarthSatellite, load, wgs84
+
+C_KM_S = 299792.458
+MJD_EPOCH = datetime(1858, 11, 17, tzinfo=timezone.utc)
+_TS = load.timescale(builtin=True)
+
+
+def range_rate_km_s(tle1: str, tle2: str, lat: float, lon: float, alt_m: float,
+                    times: list[datetime]) -> np.ndarray:
+    """Topocentric range rate (km/s; positive = receding) of a satellite from a ground station."""
+    sat = EarthSatellite(tle1, tle2, "sat", _TS)
+    station = wgs84.latlon(lat, lon, elevation_m=alt_m)
+    pos = (sat - station).at(_TS.from_datetimes(times))
+    r = pos.position.km
+    v = pos.velocity.km_per_s
+    return np.sum(r * v, axis=0) / np.linalg.norm(r, axis=0)
+
+
+def doppler_offset_hz(f0_hz: float, range_rate: np.ndarray) -> np.ndarray:
+    """Predicted Doppler offset (Hz) for a transmit frequency f0 and range rate (km/s)."""
+    return -f0_hz * range_rate / C_KM_S
+
+
+def uncorrect(f0_hz: float, offset_hz: np.ndarray, range_rate: np.ndarray) -> np.ndarray:
+    """Recover physical received frequency from a Doppler-corrected waterfall offset."""
+    return f0_hz + offset_hz - f0_hz * range_rate / C_KM_S
+
+
+def mjd(dt: datetime) -> float:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (dt - MJD_EPOCH).total_seconds() / 86400.0

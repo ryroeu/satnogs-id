@@ -1,0 +1,14 @@
+# Run everything through the container -- no host virtualenv. Matches the sibling repos.
+#   docker compose build
+#   docker compose run --rm app pytest -q
+#   docker compose run --rm app python -m satnogs_id.data.build ...   (data stage, lands next)
+services:
+  app:
+    build: .
+    image: satnogs-id
+    working_dir: /app
+    volumes:
+      - .:/app          # live code + read/write _eval/ etc. on the host
+    env_file:
+      - path: .env      # SatNOGS DB + HF tokens; optional so a fresh clone doesn't error
+        required: false
