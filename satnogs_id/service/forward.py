@@ -18,6 +18,7 @@ from pathlib import Path
 
 from ..id.dat import build_dat, site_line, write_catalog
 from ..id.identify import IdentifyResult, run_rffit_identify
+from ..id.nametag import NameTag, assess, resolve_messages
 from ..shared.api import SatnogsClient
 from ..shared.geometry import intdes_from_tle1, tle_epoch
 from ..shared.waterfall import load_waterfall
@@ -30,6 +31,7 @@ class ForwardID:
     result: IdentifyResult
     ambiguous_kHz: float
     epoch_gap_days: float | None = None
+    name_tag: "NameTag | None" = None
 
     @property
     def best(self) -> int | None:
@@ -95,7 +97,14 @@ def identify_observation(obs_id: int, *, intdes: str | None = None, catalog: str
         write_catalog(client.celestrak_gp_tle(intdes), catalog)
     result = run_rffit_identify(dat, catalog, site_id)
     gap = _median_epoch_gap_days(catalog, wf.start)
-    return ForwardID(obs_id, n, result, ambiguous_kHz, gap)
+    name_tag = None
+    if result.predicted is not None:
+        from ..data.build import CLUSTERS
+        cmap = next((c["callsigns"] for c in CLUSTERS.values()
+                     if "callsigns" in c and result.predicted in c["truth"]), None)
+        if cmap:
+            name_tag = assess(resolve_messages(client.telemetry(obs_id), cmap), result.predicted)
+    return ForwardID(obs_id, n, result, ambiguous_kHz, gap, name_tag=name_tag)
 
 
 def _median_epoch_gap_days(catalog: str | Path, obs_start) -> float | None:
