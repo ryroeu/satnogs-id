@@ -60,6 +60,21 @@ docker compose run --rm app python scripts/build_and_push.py --dataset _eval/geo
 docker compose run --rm app python scripts/build_and_push.py --cluster geoscan --push   # publish (needs HF token)
 ```
 
+## Name-tag confidence (Identify view)
+
+Some clusters (currently **Tevel-2**) broadcast a per-unit callsign in their telemetry. When present,
+the Identify view shows that **self-reported name tag** next to the Doppler answer as an independent
+second opinion — never as ground truth (the birds fly close enough that one pass can hear several).
+The tier is computed transparently:
+
+| tier | rule |
+|---|---|
+| **HIGH** | ≥3 decoded messages · ≥80% name the same satellite · matches the Doppler ID · not flagged shared by SatNOGS |
+| **MEDIUM** | a majority that matches Doppler, but weaker: 2 messages, or 50–80% agreement, or flagged shared |
+| **LOW** | 1 message, or no majority (roughly split) |
+| **⚠ disagrees** | a clear majority that contradicts the Doppler ID (possibly a co-audible neighbour) |
+| **none** | no messages decoded (e.g. all of Geoscan) |
+
 ## Quickstart
 
 The container *is* the environment (it bundles `strf`/`rffit`); there is no host virtualenv. Put your
