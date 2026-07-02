@@ -5,7 +5,8 @@ existing identification usable headless (no X/fonts/keypresses). No estimation i
 import sys
 
 p = sys.argv[1] if len(sys.argv) > 1 else "/opt/strf/rffit.c"
-s = open(p).read()
+with open(p, encoding="utf-8") as _f:
+    s = _f.read()
 reps = [
     (
         "int site_number[16],nsite=0,graves=0;",
@@ -14,7 +15,8 @@ reps = [
     ('"d:c:i:hs:gm:F:"', '"d:c:i:hs:gm:F:I"'),
     (
         "    case 'g':\n      graves=1;\n      break;\n",
-        "    case 'g':\n      graves=1;\n      break;\n\n    case 'I':\n      identify_only=1;\n      break;\n",
+        "    case 'g':\n      graves=1;\n      break;\n\n"
+        "    case 'I':\n      identify_only=1;\n      break;\n",
     ),
     (
         '    fprintf(stderr,"Failed to redirect stderr\\n");\n\n  cpgopen("/xs");',
@@ -30,5 +32,6 @@ reps = [
 for a, b in reps:
     assert a in s, f"patch anchor not found (strf changed?): {a[:60]!r}"
     s = s.replace(a, b, 1)
-open(p, "w").write(s)
+with open(p, "w", encoding="utf-8") as _f:
+    _f.write(s)
 print("patched rffit.c: added -I non-interactive identify")

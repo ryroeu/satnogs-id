@@ -11,6 +11,7 @@ the physical received frequency for rffit we add the correction back:
 was used to correct, so it is non-circular -- it recovers the actual received Doppler curve."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
@@ -19,6 +20,15 @@ from skyfield.api import EarthSatellite, load, wgs84
 C_KM_S = 299792.458
 MJD_EPOCH = datetime(1858, 11, 17, tzinfo=timezone.utc)
 _TS = load.timescale(builtin=True)
+
+
+@dataclass
+class Station:
+    """Ground-station location (WGS84) used for topocentric Doppler geometry."""
+
+    lat: float
+    lon: float
+    alt_m: float
 
 
 def tle_epoch(line1: str) -> datetime:
@@ -43,12 +53,12 @@ def intdes_from_tle1(line1: str) -> str:
 
 
 def range_rate_km_s(
-    tle1: str, tle2: str, lat: float, lon: float, alt_m: float, times: list[datetime]
+    tle1: str, tle2: str, station: Station, times: list[datetime]
 ) -> np.ndarray:
     """Topocentric range rate (km/s; positive = receding) of a satellite from a ground station."""
     sat = EarthSatellite(tle1, tle2, "sat", _TS)
-    station = wgs84.latlon(lat, lon, elevation_m=alt_m)
-    pos = (sat - station).at(_TS.from_datetimes(times))
+    ground = wgs84.latlon(station.lat, station.lon, elevation_m=station.alt_m)
+    pos = (sat - ground).at(_TS.from_datetimes(times))
     r = pos.position.km
     v = pos.velocity.km_per_s
     assert isinstance(r, np.ndarray) and isinstance(v, np.ndarray)
@@ -68,6 +78,7 @@ def uncorrect(
 
 
 def mjd(dt: datetime) -> float:
+    """Modified Julian Date of a datetime (naive datetimes are treated as UTC)."""
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return (dt - MJD_EPOCH).total_seconds() / 86400.0

@@ -13,6 +13,8 @@ _NAME_RE = re.compile(r"obs(\d+)_n(\d+)_st(\d+)")
 
 @dataclass
 class PassRecord:
+    """One harvested pass: its observation id, truth NORAD, station, and file paths."""
+
     obs_id: int
     norad: int  # truth: the SatNOGS-assigned catalog object for this observation
     station: int
@@ -25,10 +27,13 @@ class PassRecord:
 
 @dataclass
 class Dataset:
+    """A harvested eval dataset: a root directory plus the pass records in its manifest."""
+
     root: Path
     records: list[PassRecord]
 
     def save(self) -> Path:
+        """Write the records to ``manifest.json`` under the dataset root."""
         self.root.mkdir(parents=True, exist_ok=True)
         manifest = self.root / "manifest.json"
         manifest.write_text(json.dumps([asdict(r) for r in self.records], indent=2))
@@ -36,6 +41,7 @@ class Dataset:
 
     @classmethod
     def load(cls, root: str | Path) -> "Dataset":
+        """Load a dataset's records from a directory's ``manifest.json``."""
         root = Path(root)
         recs = [
             PassRecord(**d) for d in json.loads((root / "manifest.json").read_text())
@@ -43,9 +49,11 @@ class Dataset:
         return cls(root, recs)
 
     def h5_path(self, r: PassRecord) -> Path:
+        """Absolute path to a record's ``.h5`` file."""
         return self.root / r.h5
 
     def catalog_path(self, r: PassRecord) -> Path:
+        """Absolute path to a record's candidate catalog."""
         return self.root / r.catalog
 
 

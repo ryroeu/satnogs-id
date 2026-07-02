@@ -8,6 +8,7 @@ Run in-container: docker compose run --rm app python -m satnogs_id.data.build ge
 
 from __future__ import annotations
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..shared.api import SatnogsClient, nearest_tle
@@ -61,14 +62,70 @@ CLUSTERS: dict[str, dict] = {
 }
 
 
+@dataclass
+class HarvestParams:
+    """Tuning knobs for `harvest`: passes per object, min elevation, and pages to paginate."""
+
+    k: int = 12
+    min_alt: float = 25.0
+    max_pages: int = 3
+
+
+@dataclass
+class _HarvestRun:
+    """Shared state threaded through the per-pass harvest helpers."""
+
+    client: SatnogsClient
+    ds: Dataset
+    cand_obs: dict[int, list[dict]]
+    soup: list[int]
+
+
+def _strong_passes(observations: list[dict], min_alt: float) -> list[dict]:
+    """Strong (with-signal, high-elevation) passes for one object, best elevation first."""
+    return sorted(
+        (
+            o
+            for o in observations
+            if o.get("waterfall_status") == "with-signal"
+            and (o.get("max_altitude") or 0) >= min_alt
+        ),
+        key=lambda o: -(o.get("max_altitude") or 0),
+    )
+
+
+def _write_soup_catalog(
+    path: Path, soup: list[int], cand_obs: dict[int, list[dict]], tdate: str
+) -> None:
+    """Write an epoch-matched candidate catalog (the whole launch's soup) for one pass date."""
+    with open(path, "w", encoding="utf-8") as g:
+        for n in soup:
+            t = nearest_tle(cand_obs[n], tdate)
+            if t:
+                g.write(f"{t[0]}\n{t[1]}\n{t[2]}\n")
+
+
+def _try_pass(run: _HarvestRun, o: dict, norad: int) -> PassRecord | None:
+    """Download one pass's `.h5` + soup catalog and return its PassRecord, or None if unusable."""
+    oid, station, tdate = o["id"], o.get("ground_station"), o["start"][:10]
+    url = run.client.h5_url(oid)
+    if not url or station is None:
+        return None
+    h5rel = f"h5/obs{oid}_n{norad}_st{station}.h5"
+    run.client.download(url, run.ds.root / h5rel)
+    catrel = f"catalogs/soup_{oid}.tle"
+    _write_soup_catalog(run.ds.root / catrel, run.soup, run.cand_obs, tdate)
+    return PassRecord(oid, norad, int(station), h5rel, catrel, tdate)
+
+
 def harvest(
     cluster: str,
     out_dir: str,
-    k: int = 12,
-    min_alt: float = 25.0,
-    max_pages: int = 3,
+    params: HarvestParams | None = None,
     client: SatnogsClient | None = None,
 ) -> Dataset:
+    """Harvest up to ``params.k`` strong passes per truth object into ``out_dir``."""
+    p = params or HarvestParams()
     cfg = CLUSTERS[cluster]
     client = client if client is not None else SatnogsClient()
     ds = Dataset(root=Path(out_dir), records=[])
@@ -77,39 +134,19 @@ def harvest(
 
     # One paginated fetch per candidate; the polite client caches each, so re-runs cost no requests.
     cand_obs = {
-        n: client.observations(norad=n, max_pages=max_pages) for n in cfg["soup"]
+        n: client.observations(norad=n, max_pages=p.max_pages) for n in cfg["soup"]
     }
+    run = _HarvestRun(client, ds, cand_obs, cfg["soup"])
 
     for norad, name in cfg["truth"].items():
-        strong = sorted(
-            (
-                o
-                for o in cand_obs[norad]
-                if o.get("waterfall_status") == "with-signal"
-                and (o.get("max_altitude") or 0) >= min_alt
-            ),
-            key=lambda o: -(o.get("max_altitude") or 0),
-        )
         got = 0
-        for o in strong:
-            if got >= k:
+        for o in _strong_passes(cand_obs[norad], p.min_alt):
+            if got >= p.k:
                 break
-            oid, station, tdate = o["id"], o.get("ground_station"), o["start"][:10]
-            url = client.h5_url(oid)
-            if not url or station is None:
-                continue
-            h5rel = f"h5/obs{oid}_n{norad}_st{station}.h5"
-            client.download(url, ds.root / h5rel)
-            catrel = f"catalogs/soup_{oid}.tle"
-            with open(ds.root / catrel, "w") as g:
-                for n in cfg["soup"]:
-                    t = nearest_tle(cand_obs[n], tdate)
-                    if t:
-                        g.write(f"{t[0]}\n{t[1]}\n{t[2]}\n")
-            ds.records.append(
-                PassRecord(oid, norad, int(station), h5rel, catrel, tdate)
-            )
-            got += 1
+            rec = _try_pass(run, o, norad)
+            if rec is not None:
+                ds.records.append(rec)
+                got += 1
         print(f"{name} ({norad}): {got} passes")
 
     ds.save()
@@ -140,9 +177,7 @@ def _main() -> None:
     harvest(
         args.cluster,
         args.out_dir,
-        k=args.k,
-        min_alt=args.min_alt,
-        max_pages=args.max_pages,
+        params=HarvestParams(k=args.k, min_alt=args.min_alt, max_pages=args.max_pages),
     )
 
 

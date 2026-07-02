@@ -1,10 +1,13 @@
 """Assemble the satnogs-id Doppler dataset and push it to the Hugging Face Hub -- the project's
 distribution artifact, mirroring satnogs-signal's published waterfalls dataset. We publish labeled
-Doppler TRACKS (not the heavy `.h5`): per pass, the un-corrected received-frequency curve + station
-+ truth NORAD, so the set is a ready supervised benchmark for near-identical cluster identification.
-(satnogs-id wraps strf/rffit and trains no model, so the dataset -- not a model -- is the artifact.)"""
+Doppler TRACKS (not the heavy `.h5`): per pass, the un-corrected received-frequency curve, the
+station, and the truth NORAD -- a ready supervised benchmark for near-identical cluster id.
+(satnogs-id wraps strf/rffit and trains no model, so the dataset -- not a model -- is the
+artifact.)"""
 
 from __future__ import annotations
+
+from datasets import Dataset as HFDataset, Features, Sequence, Value
 
 from .dataset import Dataset
 from ..id.dat import extract_doppler
@@ -34,9 +37,9 @@ def build_records(
                 "start": r.start,
                 "intdes": intdes_from_tle1(wf.tle[1]),
                 "frequency_hz": wf.f0_hz,
-                "station_lat": wf.lat,
-                "station_lon": wf.lon,
-                "station_alt_m": wf.alt_m,
+                "station_lat": wf.station.lat,
+                "station_lon": wf.station.lon,
+                "station_alt_m": wf.station.alt_m,
                 "time_mjd": time_mjd,
                 "freq_recv_hz": freq_recv_hz,
                 "n_points": len(time_mjd),
@@ -46,8 +49,7 @@ def build_records(
 
 
 def to_hf_dataset(records: list[dict]):
-    from datasets import Dataset as HFDataset, Features, Sequence, Value
-
+    """Build a typed ``datasets.Dataset`` from the per-pass record dicts."""
     features = Features(
         {
             "obs_id": Value("int64"),
@@ -69,4 +71,5 @@ def to_hf_dataset(records: list[dict]):
 
 
 def push(hf_dataset, repo_id: str = REPO_ID, private: bool = True):  # pragma: no cover
+    """Push the assembled dataset to the Hugging Face Hub."""
     hf_dataset.push_to_hub(repo_id, private=private)

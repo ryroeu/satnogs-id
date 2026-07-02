@@ -8,6 +8,7 @@ import time
 import hashlib
 import urllib.request
 import urllib.error
+from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -15,10 +16,12 @@ from .config import settings
 
 
 class RateLimited(Exception):
-    pass
+    """Raised when the SatNOGS/CelesTrak rate limiter is not cleared within max_retries."""
 
 
 class SatnogsClient:
+    """Polite SatNOGS/CelesTrak client: on-disk cache, request throttling, 429 backoff."""
+
     NETWORK = "https://network.satnogs.org/api"
     DB = "https://db.satnogs.org/api"
     CELESTRAK_GP = "https://celestrak.org/NORAD/elements/gp.php"
@@ -49,11 +52,11 @@ class SatnogsClient:
             if wait > 0:
                 time.sleep(wait)
             try:
-                resp = urllib.request.urlopen(
+                with urllib.request.urlopen(
                     urllib.request.Request(url, headers=headers), timeout=30
-                )
-                self._last = time.monotonic()
-                return resp.read(), resp.headers
+                ) as resp:
+                    self._last = time.monotonic()
+                    return resp.read(), resp.headers
             except urllib.error.HTTPError as e:
                 self._last = time.monotonic()
                 if e.code == 429 and attempt < self.max_retries - 1:
@@ -63,6 +66,7 @@ class SatnogsClient:
         raise RateLimited(url)
 
     def get_json(self, url: str, auth: bool = False, use_cache: bool = True) -> Any:
+        """GET a URL and parse JSON, using the on-disk cache when enabled."""
         key = self.cache / (hashlib.sha1(url.encode()).hexdigest() + ".json")
         if use_cache and key.exists():
             return json.loads(key.read_text())
@@ -119,10 +123,12 @@ class SatnogsClient:
         return out
 
     def observation(self, obs_id: int | str) -> dict:
+        """Fetch a single Network observation record by its id."""
         return self.get_json(f"{self.NETWORK}/observations/?id={obs_id}&format=json")[0]
 
     # ---- SatNOGS DB (artifacts are authenticated) ----
     def artifacts(self, network_obs_id: int | str) -> list[dict]:
+        """Artifact records (the `.h5` waterfalls) for a Network observation, from the DB API."""
         r = self.get_json(
             f"{self.DB}/artifacts/?network_obs_id={network_obs_id}&format=json",
             auth=True,
@@ -169,6 +175,7 @@ class SatnogsClient:
         ]
 
     def h5_url(self, network_obs_id: int | str) -> str | None:
+        """URL of the first artifact `.h5` for an observation, or None when there is none."""
         for a in self.artifacts(network_obs_id):
             if a.get("artifact_file"):
                 return a["artifact_file"]
@@ -183,12 +190,13 @@ class SatnogsClient:
             req = urllib.request.Request(
                 url, headers={"Authorization": f"Token {settings.db_key}"}
             )
-            dest.write_bytes(urllib.request.urlopen(req, timeout=120).read())
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                dest.write_bytes(resp.read())
         return dest
 
     # ---- CelesTrak GP (public) ----
     def celestrak_gp_tle(self, intdes: str) -> list[tuple[str, str, str]]:
-        """3LE rows for a launch's international designator (e.g. '2025-155'), via CelesTrak current GP."""
+        """3LE rows for a launch's international designator (e.g. '2025-155'), from CelesTrak GP."""
         body, _ = self._raw(
             f"{self.CELESTRAK_GP}?INTDES={intdes}&FORMAT=tle",
             auth=False,
@@ -203,9 +211,7 @@ class SatnogsClient:
 def nearest_tle(
     observations: Iterable[dict], target_date: str
 ) -> tuple[str, str, str] | None:
-    """Pick the per-obs TLE (tle0/1/2) whose observation date is closest to target_date (YYYY-MM-DD)."""
-    from datetime import date
-
+    """Pick the per-obs TLE (tle0/1/2) whose date is nearest target_date (YYYY-MM-DD)."""
     td = date.fromisoformat(target_date[:10])
     best, best_dd = None, 10**9
     for o in observations:

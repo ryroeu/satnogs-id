@@ -11,12 +11,15 @@ import os
 import sys
 from pathlib import Path
 
+from huggingface_hub import HfApi
+
 from satnogs_id.data.build import CLUSTERS, harvest
 from satnogs_id.data.dataset import Dataset, manifest_from_dir
 from satnogs_id.data.publish import REPO_ID, build_records, push, to_hf_dataset
 
 
 def main() -> None:
+    """Build the dataset from one or more clusters, save it, and optionally publish to the Hub."""
     ap = argparse.ArgumentParser(
         description="Build + optionally publish the satnogs-id Doppler dataset."
     )
@@ -71,15 +74,14 @@ def main() -> None:
     if args.push:
         if not (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")):
             print(
-                "ERROR: no HF token in env. Add HUGGING_FACE_HUB_TOKEN to .env and re-run with --push.",
+                "ERROR: no HF token in env. Add HUGGING_FACE_HUB_TOKEN to .env and re-run "
+                "with --push.",
                 file=sys.stderr,
             )
             sys.exit(1)
         print(f"pushing to the Hub: {REPO_ID}...")
         push(hf)
         print("pushed.")
-
-        from huggingface_hub import HfApi
 
         api = HfApi()
         card = Path(args.card)

@@ -1,6 +1,6 @@
-"""Decoded name-tag confidence: read a satellite's self-reported AX.25 callsign from an observation's
-decoded frames and score it against the Doppler ID as a supplemental second opinion (never truth).
-See docs/superpowers/specs/2026-06-30-decoded-name-confidence-design.md."""
+"""Decoded name-tag confidence: read a satellite's self-reported AX.25 callsign from an
+observation's decoded frames and score it against the Doppler ID as a supplemental second opinion
+(never truth). See docs/superpowers/specs/2026-06-30-decoded-name-confidence-design.md."""
 
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ def parse_callsign(frame_hex: str) -> str | None:
 
 @dataclass
 class NameTag:
+    """A scored name-tag opinion: the dominant satellite, its tier, agreement, and a reason."""
+
     norad: int | None  # dominant resolved satellite (None when tier == "NONE")
     tier: str  # HIGH | MEDIUM | LOW | DISAGREES | NONE
     agrees: bool | None  # vs the Doppler ID; None when tier == "NONE"
@@ -75,8 +77,8 @@ def assess(messages: list[tuple[int, bool]], predicted_norad: int) -> NameTag:
 def resolve_messages(
     frames: list[dict], callsign_map: dict[str, int]
 ) -> list[tuple[int, bool]]:
-    """Turn raw telemetry frames into (resolved_norad, flagged_shared). Frames whose callsign doesn't
-    parse or isn't in the cluster's callsign map are dropped."""
+    """Turn raw telemetry frames into (resolved_norad, flagged_shared). Frames whose callsign
+    does not parse or is not in the cluster's callsign map are dropped."""
     out: list[tuple[int, bool]] = []
     for fr in frames:
         callsign = parse_callsign(fr.get("frame") or "")

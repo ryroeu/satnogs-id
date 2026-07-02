@@ -14,6 +14,7 @@ from satnogs_id.id.identify import run_rffit_identify
 
 
 def main() -> None:
+    """Parse args, run the identification, and print the ranked candidates."""
     ap = argparse.ArgumentParser(
         description="Identify a SatNOGS emitter from its Doppler via rffit."
     )
@@ -29,7 +30,7 @@ def main() -> None:
     if n == 0:
         print("no signal track extracted")
         return
-    with open(args.sites_txt, "a") as f:
+    with open(args.sites_txt, "a", encoding="utf-8") as f:
         f.write(site_line(wf, args.site))
     res = run_rffit_identify(dat, args.catalog, args.site)
     print(f"{n} track points; predicted NORAD: {res.predicted}")

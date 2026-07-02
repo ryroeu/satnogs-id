@@ -10,21 +10,25 @@ from pathlib import Path
 
 @dataclass
 class IdentifyResult:
+    """rffit's ranking of candidates by Doppler RMS, plus helpers to query it."""
+
     predicted: int | None  # best-fitting NORAD (lowest Doppler RMS), or None
     ranking: list[tuple[float, int]] = field(
         default_factory=list
     )  # (rms_kHz, norad), ascending
 
     def rank_of(self, norad: int) -> int | None:
+        """1-based rank of ``norad`` in the ranking, or None if absent."""
         for i, (_rms, n) in enumerate(self.ranking):
             if n == norad:
                 return i + 1
         return None
 
     def rms_of(self, norad: int) -> float | None:
+        """Doppler RMS (kHz) for ``norad``, or None if absent."""
         return next((rms for rms, n in self.ranking if n == norad), None)
 
-    def margin_kHz(self, true_norad: int) -> float | None:
+    def margin_khz(self, true_norad: int) -> float | None:
         """RMS gap from the true object to the best *other* candidate (best confuser)."""
         trms = self.rms_of(true_norad)
         conf = next((rms for rms, n in self.ranking if n != true_norad), None)
@@ -38,6 +42,7 @@ def run_rffit_identify(
     rffit_bin: str = "/opt/strf/rffit",
     st_datadir: str = "/opt/strf",
 ) -> IdentifyResult:
+    """Run rffit's headless ``-I`` identify and parse its ranked output into an IdentifyResult."""
     out = subprocess.run(
         [
             rffit_bin,
@@ -51,6 +56,7 @@ def run_rffit_identify(
         ],
         capture_output=True,
         text=True,
+        check=False,
         env={**os.environ, "ST_DATADIR": st_datadir},
     )
     ranking: list[tuple[float, int]] = []
